@@ -11,7 +11,7 @@ datasource db {
 }
 
 enum Papel {
-  PROFESSOR
+  PROFESSOR                                     
   ADMIN
 }
 
