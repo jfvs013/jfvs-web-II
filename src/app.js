@@ -1,10 +1,17 @@
+// src/app.js
+
 import express from "express";
 import prisma from "./config/database.js";
+
+import userRoutes from "./routes/userRoutes.js";
+import subjectRoutes from "./routes/subjectRoutes.js";
+import questionRoutes from "./routes/questionRoutes.js";
 
 const app = express();
 
 app.use(express.json());
 
+// Health Check
 app.get("/health", async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -36,111 +43,16 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/users", async (req, res) => {
-  try {
-    const usuarios = await prisma.user.findMany({
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        papel: true,
-        foto: true,
-        createdAt: true,
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
+// Rotas
+app.use("/users", userRoutes);
+app.use("/subjects", subjectRoutes);
+app.use("/questions", questionRoutes);
 
-    res.status(200).json({
-      success: true,
-      data: usuarios,
-      total: usuarios.length,
-    });
-  } catch (error) {
-    console.error("Erro ao buscar usuários:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Erro ao buscar usuários",
-    });
-  }
-});
-
-app.get("/subjects", async (req, res) => {
-  try {
-    const subjects = await prisma.subject.findMany({
-      include: {
-        professor: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            papel: true,
-            foto: true,
-          },
-        },
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: subjects,
-      total: subjects.length,
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: "Erro ao buscar matérias",
-    });
-  }
-});
-
-app.get("/questions", async (req, res) => {
-  try {
-    const questions = await prisma.question.findMany({
-      include: {
-        subject: true,
-        author: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-            papel: true,
-            foto: true,
-          },
-        },
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: questions,
-      total: questions.length,
-    });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      success: false,
-      message: "Erro ao buscar questões",
-    });
-  }
-});
-
+// 404
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message:
-      "Rota " + req.method + " " + req.originalUrl + " não encontrada",
+    message: `Rota ${req.method} ${req.originalUrl} não encontrada`,
   });
 });
 
