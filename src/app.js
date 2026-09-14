@@ -1,4 +1,4 @@
-//src/app.js
+// src/app.js
 import express from "express";
 import prisma from "./config/database.js";
 
@@ -16,7 +16,9 @@ app.get("/health", async (req, res) => {
       timestamp: new Date().toISOString(),
       services: {
         api: "OK",
-        database: { status: "OK" },
+        database: {
+          status: "OK",
+        },
       },
     });
   } catch (error) {
@@ -27,7 +29,9 @@ app.get("/health", async (req, res) => {
       message: "API do Gerador de Provas",
       services: {
         api: "OK",
-        database: { status: "ERROR" },
+        database: {
+          status: "ERROR",
+        },
       },
     });
   }
@@ -44,7 +48,9 @@ app.get("/users", async (req, res) => {
         foto: true,
         createdAt: true,
       },
-      orderBy: { id: "asc" },
+      orderBy: {
+        id: "asc",
+      },
     });
 
     res.status(200).json({
@@ -58,6 +64,77 @@ app.get("/users", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Erro ao buscar usuários",
+    });
+  }
+});
+
+app.get("/subjects", async (req, res) => {
+  try {
+    const subjects = await prisma.subject.findMany({
+      include: {
+        professor: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            papel: true,
+            foto: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: {
+        id: "asc",
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: subjects,
+      total: subjects.length,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar matérias:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar matérias",
+    });
+  }
+});
+
+app.get("/questions", async (req, res) => {
+  try {
+    const questions = await prisma.question.findMany({
+      include: {
+        subject: true,
+        author: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+            papel: true,
+            foto: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: {
+        id: "asc",
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: questions,
+      total: questions.length,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar questões:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Erro ao buscar questões",
     });
   }
 });
