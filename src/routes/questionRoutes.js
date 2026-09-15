@@ -1,15 +1,12 @@
-import { Router } from "express";
+import express from "express";
+import * as questionController from "../controllers/questionController.js";
 
-import {
-  listarQuestions,
-  buscarQuestionPorId,
-  criarQuestion,
-} from "../controllers/questionController.js";
+const router = express.Router();
 
-const router = Router();
-
-router.get("/", listarQuestions);
-router.get("/:id", buscarQuestionPorId);
-router.post("/", criarQuestion);
+router.post("/", questionController.create);
+router.get("/", questionController.getAll);
+router.get("/:id", questionController.getById);
+router.patch("/:id", questionController.update);
+router.delete("/:id", questionController.remove);
 
 export default router;

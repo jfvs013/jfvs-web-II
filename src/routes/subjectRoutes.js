@@ -1,18 +1,12 @@
-//src/routes/subjectRoutes.js
-import { Router } from "express";
+import express from "express";
+import * as subjectController from "../controllers/subjectController.js";
 
-import {
-  listarSubjects,
-  buscarSubjectPorId,
-  criarSubject,
-} from "../controllers/subjectController.js";
+const router = express.Router();
 
-const router = Router();
-
-router.get("/", listarSubjects);
-
-router.get("/:id", buscarSubjectPorId);
-
-router.post("/", criarSubject);
+router.post("/", subjectController.create);
+router.get("/", subjectController.getAll);
+router.get("/:id", subjectController.getById);
+router.patch("/:id", subjectController.update);
+router.delete("/:id", subjectController.remove);
 
 export default router;
