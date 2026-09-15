@@ -1,130 +1,271 @@
-// src/controllers/userController.js
+import * as userService from "../services/userService.js";
 
-import prisma from "../config/database.js";
+const ALLOWED_FIELDS = ["nome", "email", "papel", "foto"];
+const VALID_ROLES = ["PROFESSOR", "ADMIN"];
 
-export async function getUsers(req, res) {
-  try {
-    const usuarios = await prisma.user.findMany({
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        papel: true,
-        foto: true,
-        createdAt: true,
-      },
-      orderBy: {
-        id: "asc",
-      },
-    });
+const toPositiveInt = (value) => {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
 
-    return res.status(200).json({
-      success: true,
-      data: usuarios,
-      total: usuarios.length,
-    });
-  } catch (error) {
-    console.error("Erro ao buscar usuários:", error);
+const hasAllowedPatchField = (body) => {
+  return ALLOWED_FIELDS.some((field) => Object.hasOwn(body, field));
+};
 
-    return res.status(500).json({
-      success: false,
-      message: "Erro ao buscar usuários",
-    });
-  }
-}
+const hasInvalidUserFields = (body) => {
+  return Object.keys(body).some((field) => !ALLOWED_FIELDS.includes(field));
+};
 
-export async function getUserById(req, res) {
-  try {
-    const id = Number(req.params.id);
-
-    // Validação do ID
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "ID inválido",
-      });
-    }
-
-    const usuario = await prisma.user.findUnique({
-      where: {
-        id,
-      },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        papel: true,
-        foto: true,
-        createdAt: true,
-      },
-    });
-
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        message: "Usuário não encontrado",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: usuario,
-    });
-  } catch (error) {
-    console.error("Erro ao buscar usuário:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Erro ao buscar usuário",
-    });
-  }
-}
-
-export async function createUser(req, res) {
+export const create = async (req, res) => {
   try {
     const { nome, email, papel, foto } = req.body;
 
-    // Validação dos campos obrigatórios
-    if (!nome || !email) {
+    if (
+      typeof nome !== "string" ||
+      !nome.trim() ||
+      typeof email !== "string" ||
+      !email.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Nome e email são obrigatórios",
+        message: "Nome e email são obrigatórios.",
       });
     }
 
-    // Verifica se o email já existe
-    const usuarioExistente = await prisma.user.findUnique({
-      where: {
-        email,
-      },
+    if (papel !== undefined && !VALID_ROLES.includes(papel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Papel inválido.",
+      });
+    }
+
+    if (foto !== undefined && foto !== null && typeof foto !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Foto deve ser um texto ou null.",
+      });
+    }
+
+    const result = await userService.createUser({
+      nome,
+      email,
+      papel,
+      foto,
     });
 
-    if (usuarioExistente) {
+    if (!result.ok && result.reason === "EMAIL_CONFLICT") {
       return res.status(409).json({
         success: false,
-        message: "Email já cadastrado",
+        message: "E-mail já cadastrado.",
       });
     }
-
-    const usuario = await prisma.user.create({
-      data: {
-        nome,
-        email,
-        papel,
-        foto,
-      },
-    });
 
     return res.status(201).json({
       success: true,
-      data: usuario,
+      data: result.data,
     });
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Erro ao criar usuário",
+      message: "Erro interno ao criar usuário.",
     });
   }
-}
+};
+
+export const getAll = async (req, res) => {
+  try {
+    const users = await userService.getAllUsers();
+
+    return res.status(200).json({
+      success: true,
+      data: users,
+      total: users.length,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar usuários:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao buscar usuários.",
+    });
+  }
+};
+
+export const getById = async (req, res) => {
+  try {
+    const id = toPositiveInt(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID inválido.",
+      });
+    }
+
+    const user = await userService.getUserById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuário não encontrado.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar usuário:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao buscar usuário.",
+    });
+  }
+};
+
+export const update = async (req, res) => {
+  try {
+    const id = toPositiveInt(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID inválido.",
+      });
+    }
+
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({
+        success: false,
+        message: "Corpo da requisição inválido.",
+      });
+    }
+
+    if (!hasAllowedPatchField(req.body)) {
+      return res.status(400).json({
+        success: false,
+        message: "Informe ao menos um campo para atualização.",
+      });
+    }
+
+    if (hasInvalidUserFields(req.body)) {
+      return res.status(400).json({
+        success: false,
+        message: "Campo inválido.",
+      });
+    }
+
+    const { nome, email, papel, foto } = req.body;
+
+    if (
+      Object.hasOwn(req.body, "nome") &&
+      (typeof nome !== "string" || !nome.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Nome deve ser um texto não vazio.",
+      });
+    }
+
+    if (
+      Object.hasOwn(req.body, "email") &&
+      (typeof email !== "string" || !email.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Email deve ser um texto não vazio.",
+      });
+    }
+
+    if (Object.hasOwn(req.body, "papel") && !VALID_ROLES.includes(papel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Papel inválido.",
+      });
+    }
+
+    if (
+      Object.hasOwn(req.body, "foto") &&
+      foto !== null &&
+      typeof foto !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Foto deve ser um texto ou null.",
+      });
+    }
+
+    const result = await userService.updateUser(id, req.body);
+
+    if (!result.ok && result.reason === "NOT_FOUND") {
+      return res.status(404).json({
+        success: false,
+        message: "Usuário não encontrado.",
+      });
+    }
+
+    if (!result.ok && result.reason === "EMAIL_CONFLICT") {
+      return res.status(409).json({
+        success: false,
+        message: "E-mail já cadastrado.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar usuário:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao atualizar usuário.",
+    });
+  }
+};
+
+export const remove = async (req, res) => {
+  try {
+    const id = toPositiveInt(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "ID inválido.",
+      });
+    }
+
+    const result = await userService.deleteUser(id);
+
+    if (!result.ok && result.reason === "NOT_FOUND") {
+      return res.status(404).json({
+        success: false,
+        message: "Usuário não encontrado.",
+      });
+    }
+
+    if (!result.ok && result.reason === "USER_IN_USE") {
+      return res.status(409).json({
+        success: false,
+        message: "Usuário está vinculado a matérias ou questões.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Erro ao excluir usuário:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Erro interno ao excluir usuário.",
+    });
+  }
+};
